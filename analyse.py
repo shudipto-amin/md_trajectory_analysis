@@ -28,14 +28,14 @@ def get_data(psf, traj, sysinfo):
 
     return uni
        
-def get_rdf(uni, atom1, atom2, **kwargs):
+def get_rdf(uni, sel1, sel2, **kwargs):
     '''
     Calculates rdf for atom selections in a Universe object
 
     returns: MDAnalysis.analysis.rdf object, and atom selections
     '''
-    g1 = uni.select_atoms(f'name {atom1}')
-    g2 = uni.select_atoms(f'name {atom2}')
+    g1 = uni.select_atoms(sel1)
+    g2 = uni.select_atoms(sel2)
 
     rdf = RDF.InterRDF(g1, g2, **kwargs)
     rdf.run()
@@ -50,7 +50,9 @@ if __name__ == "__main__":
     uni = get_data(psf, traj, sysinfo)
 
     # Get distances (r), rdf (gab)
-    rdf, g1, g2 = get_rdf(uni, 'OH2', 'OH2', nbins=200, range=(1,5))
+
+
+    rdf, g1, g2 = get_rdf(uni, 'name OH2', 'name H1 or name H2', nbins=200, range=(1,5))
     r = rdf.results['bins']
     gab = rdf.results['rdf'] 
 
@@ -68,7 +70,7 @@ if __name__ == "__main__":
 
     ax.set_ylabel("$g_{ab}(r)$", color='grey', fontsize=16)
     ax2.set_ylabel("$N_{ab}(r)$", color='black', fontsize=16)
-
+    pp.show()
     fig.savefig("rdf_and_coordination.png")
     
 
