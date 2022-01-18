@@ -6,7 +6,7 @@ import json
 
 import matplotlib.pyplot as pp
 
-def get_data(psf, traj, sysinfo):
+def get_data(psf, traj, sysinfo=None):
     '''
     Constructs Universe object from files.
 
@@ -20,11 +20,12 @@ def get_data(psf, traj, sysinfo):
 
     uni = mda.Universe(psf, traj)
     
-    with open(sysinfo, 'r') as inp:
-        data = json.load(inp)
-            
-    trans = transformations.boxdimensions.set_dimensions(data['dimensions'])
-    uni.trajectory.add_transformations(trans)
+    if sysinfo is not None:
+        with open(sysinfo, 'r') as inp:
+            data = json.load(inp)
+                
+        trans = transformations.boxdimensions.set_dimensions(data['dimensions'])
+        uni.trajectory.add_transformations(trans)
 
     return uni
        
@@ -41,25 +42,7 @@ def get_rdf(uni, sel1, sel2, **kwargs):
     rdf.run()
     return rdf, g1, g2
 
- 
-if __name__ == "__main__":
-    psf = 'example.psf'
-    traj = 'example.pdb'
-    sysinfo = 'sysinfo.dat'
-
-    uni = get_data(psf, traj, sysinfo)
-
-    # Get distances (r), rdf (gab)
-
-
-    rdf, g1, g2 = get_rdf(uni, 'name OH2', 'name H1 or name H2', nbins=200, range=(1,5))
-    r = rdf.results['bins']
-    gab = rdf.results['rdf'] 
-
-    # Get average no. of particles within r, as function of r (Nab)
-    Nab = np.cumsum(rdf.results['count']) / g1.n_atoms
-    
-    # Plot gab and cdf vs r
+def plot_rdf_cdf(r, gab, Nab):
     fig, ax = pp.subplots()
     ax2 = ax.twinx()
 
@@ -70,8 +53,74 @@ if __name__ == "__main__":
 
     ax.set_ylabel("$g_{ab}(r)$", color='grey', fontsize=16)
     ax2.set_ylabel("$N_{ab}(r)$", color='black', fontsize=16)
-    pp.show()
-    fig.savefig("rdf_and_coordination.png")
+
+    return fig, ax, ax2
+
+def get_rdf_peaks(rdf):
+    pass
+
+def get_contact(uni, seltxt):
+    sel = uni.select_atoms(seltxt, updating=True)
+    print(uni)
+    print(uni.trajectory)
+    counts = []
+    for ts in uni.trajectory:
+        counts.append(sel.n_atoms)
+    
+    bin_edges = np.arange(min(counts) - 0.5, max(counts) + 1.5)
+    
+    return counts, bin_edges
+    
+ 
+if __name__ == "__main__":
+    psf = 'output.pdb'
+    traj = 'output.dcd'
+    sysinfo = None
+
+    uni = get_data(psf, traj, sysinfo)
+
+    # Atom selections
+    names = {
+        'sulfurs' : 'name S*',
+        'nitrogens' : 'name N*',
+        'oxygens' : 'name O*',
+        'all' : 'name S* or name N* or name O*'
+    }
+
+    # RDFs of each selection around Zn:
+    for sel, seltxt in names.items():
+        # Get distances (r), rdf (gab)
+        rdf, g1, g2 = get_rdf(uni, 'name ZN', f'{seltxt}', nbins=200, range=(1,5))
+        r = rdf.results['bins']
+        gab = rdf.results['rdf'] 
+
+        # Get average no. of particles within r, as function of r (Nab)
+        Nab = np.cumsum(rdf.results['count']) / (g1.n_atoms * uni.trajectory.n_frames)
+        
+        # Plot gab and cdf vs r
+        fig, ax, ax2 = plot_rdf_cdf(r, gab, Nab)
+        fig.suptitle(sel)
+
+        #pp.show()
+        fig.savefig(f"rdf_and_coordination_{sel}.png")
     
 
-        
+    # Distribution of number of atoms around Zn within cutoff
+    cutoff = 2.1  # choose based on RDF
+    atom = "ZN"
+    seltxt = f"around {cutoff} name {atom}"
+    print(seltxt)
+    counts, bin_edges = get_contact(uni, seltxt)
+
+    fig, ax = pp.subplots()
+    ax.set_xlabel("Coordination number")
+    ax.set_ylabel("Frequency")
+    ax.hist(counts, bin_edges)
+    fig.savefig(f"contact_around_{atom}_{cutoff}.png")
+
+    fig,ax = pp.subplots()
+    ax.set_xlabel("Frame no.")
+    ax.set_ylabel("Coordination number")
+    ax.plot(counts)
+    fig.savefig(f"cn_vs_frame_{atom}_{cutoff}.png")
+    pp.show()

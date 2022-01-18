@@ -1,3 +1,4 @@
+*.dcd
 *.swp
 *__pycache__*
 *.pyc
