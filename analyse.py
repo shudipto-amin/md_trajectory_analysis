@@ -1,48 +1,137 @@
 import numpy as np
 import MDAnalysis as mda
-from MDAnalysis.analysis import rdf as RDF
+from MDAnalysis.analysis import rdf as RDF, rms as RMS
 from MDAnalysis import transformations
-import json
 
+import json
+import pandas as pd
 import matplotlib.pyplot as pp
 
-def get_data(psf, traj, sysinfo=None):
+class Universe(mda.Universe):
     '''
-    Constructs Universe object from files.
-
-    Arguments:
-        psf     : Protein Structure File for topological information
-        traj    : Trajectory (pdb, xtc, dcd, etc)
-        sysinfo : Json-format file with dimensions of system
-
-    returns: MDAnalysis.Universe object
+    Class based on mda.Universe with additional methods for analysis
     '''
+    def __init__(self, psf, traj, outfile=None,sysinfo=None):
+        '''
+        Constructs Universe object from files.
 
-    uni = mda.Universe(psf, traj)
-    
-    if sysinfo is not None:
-        with open(sysinfo, 'r') as inp:
-            data = json.load(inp)
-                
-        trans = transformations.boxdimensions.set_dimensions(data['dimensions'])
-        uni.trajectory.add_transformations(trans)
+        Arguments:
+            psf     : <str> Protein Structure File for topological information
+            traj    : <str> Trajectory (pdb, xtc, dcd, etc)
+            outfile : <str> OpenMM output file as formatted by Xiaojuan
+            sysinfo : <str> Json-format file with dimensions of system
 
-    return uni
-       
-def get_rdf(uni, sel1, sel2, **kwargs):
-    '''
-    Calculates rdf for atom selections in a Universe object
+        '''
+        mda.Universe.__init__(self, psf, traj)
+        self.psffile = psf
+        self.trajfile = traj
 
-    returns: MDAnalysis.analysis.rdf object, and atom selections
-    '''
-    g1 = uni.select_atoms(sel1)
-    g2 = uni.select_atoms(sel2)
+        if sysinfo is not None:
+            with open(sysinfo, 'r') as inp:
+                data = json.load(inp)
+                    
+            trans = transformations.boxdimensions.set_dimensions(data['dimensions'])
+            self.trajectory.add_transformations(trans)
 
-    rdf = RDF.InterRDF(g1, g2, **kwargs)
-    rdf.run()
-    return rdf, g1, g2
+        if outfile is not None:
+            self.outfile = outfile
+            self.get_outputs()
+         
+    def get_contact(self, seltxt):
+        '''
+        Get no. of atoms which satisfy selection criteria, as a function of frame number.
 
+        Arguments:
+            seltxt  : <str> Selection criteria
+
+        Returns:
+            counts  : <list> No. of atoms per frame which match seltxt criterion
+            bin_edges : <np.1darray> bin edges for plotting a histogram of counts
+        '''
+
+        sel = self.select_atoms(seltxt, updating=True)
+        counts = []
+        for ts in self.trajectory:
+            counts.append(sel.n_atoms)
+
+        bin_edges = np.arange(min(counts) - 0.5, max(counts) + 1.5)
+
+        return counts, bin_edges       
+
+    def get_macro(self):
+        '''Calcualte/get macroscopic quantities (energy, pressure, volume) vs time.'''
+        ### Must get energy and pressure from OpenMM output.
+        self.volume = []
+        for ts in self.trajectory:
+            pos = self.atoms.positions
+            sides = np.max(pos, axis=0) - np.min(pos, axis=0)
+            V = np.product(sides)
+            self.volume.append(V)
+
+        self.rmsd = self._get_rmsd('protein')
+
+    def get_outputs(self):
+        '''Get outputs from output file as pd.DataFrame'''
+        df = pd.read_csv(self.outfile)
+        self.outputs = df
+        
+    def get_rdf(self, sel1, sel2, **kwargs):
+        '''
+        Calculates rdf for atom selections in a Universe object
+
+        Arguments:
+            sel1    : <str> Selection string
+            sel2    : <str> Selection string
+            kwargs  : keyword arguments to pass to RDF.InterRDF()
+
+        returns: MDAnalysis.analysis.rdf object, and atom selection objects
+        '''
+
+        g1 = self.select_atoms(sel1)
+        g2 = self.select_atoms(sel2)
+
+        rdf = RDF.InterRDF(g1, g2, **kwargs)
+        rdf.run()
+        return rdf, g1, g2
+
+    def write_traj(self, seltxt, fname):
+        sel = self.select_atoms(seltxt)
+        with mda.Writer(fname, sel.n_atoms) as out:
+            for ts in self.trajectory:
+                out.write(sel)
+
+    def _center_protein_write(self, fname):
+        '''
+        Adds transformation to center protein and saves to file.
+        This slows down iteration, so use only for writing new trajectory to file, 
+        then load that as new universe.
+        '''
+        protein = self.select_atoms('protein')
+        not_protein = self.select_atoms('not protein')
+
+        trans = [
+            transformations.unwrap(protein),
+            transformations.center_in_box(protein),
+            transformations.wrap(not_protein)
+        ]
+        self.trajectory.add_transformations(*trans)
+        
+        self.write_traj('all', fname)
+
+    def _get_rmsd(self, seltxt, ref_frame=0):
+        '''Calculates rmsd vs frame no.'''
+        sel = self.select_atoms(seltxt)
+        rmsd = RMS.RMSD(sel)
+        rmsd.run()
+        return rmsd
+
+
+## Plotting functions
+        
 def plot_rdf_cdf(r, gab, Nab):
+    '''
+    Plots rdf (gab) and coordination (Nab) vs radial distance (r)
+    '''
     fig, ax = pp.subplots()
     ax2 = ax.twinx()
 
@@ -56,28 +145,53 @@ def plot_rdf_cdf(r, gab, Nab):
 
     return fig, ax, ax2
 
-def get_rdf_peaks(rdf):
-    pass
+def plot_macros(uni):
+    fig, axes = pp.subplots(2,1, sharex=True)
+    fig.set_size_inches(10,10)
+    fig.subplots_adjust(hspace=0)
+    # Volume and RMSD plot (top)
+    ax = axes[0]
+    ax2 = ax.twinx()
 
-def get_contact(uni, seltxt):
-    sel = uni.select_atoms(seltxt, updating=True)
-    print(uni)
-    print(uni.trajectory)
-    counts = []
-    for ts in uni.trajectory:
-        counts.append(sel.n_atoms)
+    ax.set_ylabel('Volume $\AA^3$')
+    ax2.set_ylabel('RMSD $\AA$')
+
+    ax.plot(uni.volume, color='k', linestyle='--',label="Volume")
+    ax2.plot(uni.rmsd.results.rmsd[:,-1], color='k', alpha=0.6, linewidth=1.5,label="RMSD")
+
+    lines, labels = ax.get_legend_handles_labels()
+    lines2, labels2 = ax2.get_legend_handles_labels()
+
+    ax2.legend(lines + lines2, labels + labels2, loc=0)
+
+    pot_ener =  uni.outputs['Potential Energy (kJ/mole)']
+    kin_ener =  uni.outputs['Kinetic Energy (kJ/mole)']
+    tot_ener = pot_ener + kin_ener
+
+    # Energy plot (bottom)
+    ax1 = axes[1]
+    ax12 = ax1.twinx()
+
+    ax1.plot(tot_ener, label="Total Energy", color='k', linestyle='--')
+    ax12.plot(pot_ener, label="Potential Energy", color='k', alpha=0.6, linewidth=2 )
+    ax1.set_xlabel('Frame no.')
+    ax1.set_ylabel('Total Energy (kJ/mole)')
+    ax12.set_ylabel('Potential Energy (kJ/mole)')
+
+    lines, labels = ax1.get_legend_handles_labels()
+    lines2, labels2 = ax12.get_legend_handles_labels()
+
+    ax12.legend(lines + lines2, labels + labels2, loc=0)
     
-    bin_edges = np.arange(min(counts) - 0.5, max(counts) + 1.5)
-    
-    return counts, bin_edges
-    
- 
-if __name__ == "__main__":
+
+    return fig, axes
+
+def main(save=False, show=True):
     psf = 'output.pdb'
     traj = 'output.dcd'
     sysinfo = None
-
-    uni = get_data(psf, traj, sysinfo)
+    outfile = 'data.csv'
+    uni = Universe(psf, traj, outfile=outfile, sysinfo=sysinfo)
 
     # Atom selections
     names = {
@@ -90,7 +204,7 @@ if __name__ == "__main__":
     # RDFs of each selection around Zn:
     for sel, seltxt in names.items():
         # Get distances (r), rdf (gab)
-        rdf, g1, g2 = get_rdf(uni, 'name ZN', f'{seltxt}', nbins=200, range=(1,5))
+        rdf, g1, g2 = uni.get_rdf('name ZN', f'{seltxt}', nbins=200, range=(1,5))
         r = rdf.results['bins']
         gab = rdf.results['rdf'] 
 
@@ -102,25 +216,39 @@ if __name__ == "__main__":
         fig.suptitle(sel)
 
         #pp.show()
-        fig.savefig(f"rdf_and_coordination_{sel}.png")
+        if save:
+            fig.savefig(f"rdf_and_coordination_{sel}.png")
     
 
     # Distribution of number of atoms around Zn within cutoff
     cutoff = 2.1  # choose based on RDF
     atom = "ZN"
     seltxt = f"around {cutoff} name {atom}"
-    print(seltxt)
-    counts, bin_edges = get_contact(uni, seltxt)
+    counts, bin_edges = uni.get_contact(seltxt)
 
     fig, ax = pp.subplots()
     ax.set_xlabel("Coordination number")
     ax.set_ylabel("Frequency")
     ax.hist(counts, bin_edges)
-    fig.savefig(f"contact_around_{atom}_{cutoff}.png")
+    if save:
+        fig.savefig(f"contact_around_{atom}_{cutoff}.png")
 
     fig,ax = pp.subplots()
     ax.set_xlabel("Frame no.")
     ax.set_ylabel("Coordination number")
     ax.plot(counts)
-    fig.savefig(f"cn_vs_frame_{atom}_{cutoff}.png")
-    pp.show()
+    if save:
+        fig.savefig(f"cn_vs_frame_{atom}_{cutoff}.png")
+
+    # Macroscopic quantities
+    uni.get_macro()
+    fig, axes = plot_macros(uni)
+    if save:
+        fig.savefig(f"macroplot.png")
+
+    if show:
+        pp.show()
+    
+
+if __name__ == "__main__":
+    main(save=True, show=True)
