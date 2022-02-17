@@ -4,3 +4,5 @@
 *.pyc
 *.ipynb_checkpoints*
 *.png
+
+trajectories
