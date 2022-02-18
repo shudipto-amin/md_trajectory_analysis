@@ -11,7 +11,7 @@ class Universe(mda.Universe):
     '''
     Class based on mda.Universe with additional methods for analysis
     '''
-    def __init__(self, psf, traj, outfile=None,sysinfo=None):
+    def __init__(self, psf, traj, outfile=None,sysinfo=None, *args, **kwargs):
         '''
         Constructs Universe object from files.
 
