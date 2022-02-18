@@ -100,7 +100,7 @@ class Universe(mda.Universe):
             for ts in self.trajectory:
                 out.write(sel)
 
-    def _center_protein_write(self, fname):
+    def center_protein_write(self, fname):
         '''
         Adds transformation to center protein and saves to file.
         This slows down iteration, so use only for writing new trajectory to file, 
@@ -126,6 +126,51 @@ class Universe(mda.Universe):
         return rmsd
 
 
+    def get_angles(self, sel1, sel2, sel3):
+        '''
+        Each sel* must be a selection for ONE atom only.
+        sel2 should be the selection for the atom in the middle.
+        The angle will be calculated for sel1-sel2-sel3.
+        '''
+
+        norm = np.linalg.norm
+        arccos = np.arccos
+        angles = []
+        for n, ts in enumerate(self.trajectory):
+            p1 = sel1.positions[0]
+            p2 = sel2.positions[0]
+            p3 = sel3.positions[0]
+
+            A = p1 - p2
+            B = p3 - p2
+            a = norm(A)
+            b = norm(B)
+
+            angle = arccos(np.dot(A, B) / (a*b)) * 180/np.pi
+            angles.append(angle)
+
+        return angles
+        
+    def get_distances(self, sel1, sel2):
+        '''
+        Get distances between two selections.
+        If there is more than one atom in the selection, 
+        '''
+
+        dists = []
+        
+        for n, ts in enumerate(self.trajectory):
+            dists.append([])
+            for p1 in sel1.positions:
+                for p2 in sel2.positions:
+                    d = np.linalg.norm(p1 - p2)
+                    dists[n].append(d)
+
+        return np.array(dists)
+            
+        
+      
+        
 ## Plotting functions
         
 def plot_rdf_cdf(r, gab, Nab):
