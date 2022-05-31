@@ -20,8 +20,8 @@ TimeStep = 0.02
 
 selections = {
     "backbone" : "backbone",
-    r"Zn-Cys$_2$His$_2$" : "name ZN or resname CYS or resname HIS",
-    r"Zn-S(Cys$^-$)/N(His)" : "name ZN or name SG or (name NE2 and resname HIS) "
+    # r"Zn-Cys$_2$His$_2$" : "name ZN or resname CYS or resname HIS",
+    r"binding site" : "name ZN or name SG or (name NE2 and resname HIS) "
 }
 
 def get_density(vals):
@@ -38,7 +38,7 @@ refuni = mda.Universe(ref)
 
 fig = pp.figure()
 fig.set_size_inches(8,8)
-gs = gridspec.GridSpec(3,3)
+gs = gridspec.GridSpec(len(selections), 3)
 gs.update(hspace=0.01, wspace=0.01)
 for n, sel in enumerate(selections.items()):
     print(sel)
@@ -54,11 +54,6 @@ for n, sel in enumerate(selections.items()):
         ax_left.xaxis.set_visible(False)
     else:
         ax_left.set_xlabel(r"Time (ns)", fontsize=16)
-
-    if n == (len(selections)) // 2:
-        ax_left.set_ylabel(r"RMSD ($\AA$)", fontsize=16)
-
-    
 
     ax_right.yaxis.set_visible(False)
     ax_right.xaxis.set_visible(False)
@@ -81,22 +76,23 @@ for n, sel in enumerate(selections.items()):
         )
 
         x, y = get_density(rmsd.results['rmsd'][:,2])
-        ax_right.plot(y, x)
+        ax_right.plot(y, x, label=param)
     
     ref_rmsd = RMSD(refuni, select=sel[1])
     ref_rmsd.run()
     x, y = get_density(ref_rmsd.results['rmsd'][:,2])
-    ax_right.plot(y, x, linestyle='--', color='k')
+    ax_right.plot(y, x, linestyle='--', color='k', label='NMR')
    
     ax_right.set_xlim(left=0)
     ax_left.set_xlim(min(time), max(time)) 
-    #ax_left.legend()
+
+ax_right.legend()
+fig.text(
+    0.04, 0.5, r"RMSD $(\AA)$", 
+    va='center', rotation='vertical', fontsize=16
+)
 
 fig.tight_layout()
 pp.savefig("rmsd_density.png")
 pp.show()
  
-
-        
-
-
