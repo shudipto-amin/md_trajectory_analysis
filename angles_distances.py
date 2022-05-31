@@ -7,7 +7,7 @@ import argparse
 
 ### Argument handler
 parser = argparse.ArgumentParser(
-    description = '''
+    description='''
 Script to find and plot distribution of angles and distances of:
     Zn - S (distance)
     Zn - N (distance)
@@ -18,6 +18,7 @@ Modify the SELECTIONS in script if you want to change the selections above.'''
 
 
 args = parser.parse_args()
+
 
 def plot_all(unis):
     ang_label = "Angle of S-Zn-S"
@@ -44,7 +45,7 @@ def plot_all(unis):
         s3 = uni.select_atoms(f'name SG and resid {s2_resid}')
 
         ### Get list of angles and list of distances
-        angles = uni.get_angles(s1, s2, s3)  # angle of s1-s2-s3, where s2 is at the vertex of angle
+        angles = uni.get_angles(s1, s2, s3)   # angle of s1-s2-s3
         dists12 = uni.get_distances(s1, s2)   # order doesn't matter
         dists23 = uni.get_distances(s3, s2)   # order doesn't matter
         dists13 = uni.get_distances(s3, s1)   # order doesn't matter
@@ -56,10 +57,11 @@ def plot_all(unis):
 
         ### Plot
 
-        bins = 20 # uni.trajectory.n_frames//50
+        bins = 20  # uni.trajectory.n_frames//50
         kwargs = dict(
             bins=bins, histtype='step', density=True,
-            label=label, linewidth=2) # common style for all plots
+            label=label, linewidth=2
+        )  # common style for all plots
 
         if label == 'NMR':
             kwargs['color'] = 'k'
@@ -69,18 +71,19 @@ def plot_all(unis):
 
         for n, (lab, dist) in enumerate(dist_labels_data.items()):
             a_dist[n].hist(dist, **kwargs)
-            a_dist[n].text(0.5, 0.9, lab, 
-                horizontalalignment='center', transform=a_dist[n].transAxes)
-    
-        
+            a_dist[n].text(
+                0.5, 0.9, lab,
+                horizontalalignment='center', transform=a_dist[n].transAxes
+            )
+
         f_dist.suptitle(f'Distances')
         f_ang.suptitle(ang_label)
 
     a_ang.legend()
     a_dist[0].legend(loc=1)
-    #for a in a_dist:
-    #    a.legend()
     return f_ang, f_dist
+
+
 ### Parameter sets
 
 parsets = [
@@ -91,12 +94,11 @@ ref = 'trajectories/input.pdb'
 
 
 ### Get Universes
-unis = dict(NMR = ana.Universe(ref, ref))
+unis = dict(NMR=ana.Universe(ref, ref))
 for par in parsets:
     dcd = f"trajectories/MD-1ZNF/{par}/centered_output.dcd"
     unis[par] = ana.Universe('output.pdb', dcd)
 
-#for uni in [NMR]:
 f_ang, f = plot_all(unis)
 f_ang.savefig("CTPOL_ang.png")
 f.savefig("CTPOL_dist.png")
