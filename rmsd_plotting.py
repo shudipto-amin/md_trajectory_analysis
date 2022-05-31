@@ -38,7 +38,7 @@ refuni = mda.Universe(ref)
 
 fig = pp.figure()
 fig.set_size_inches(8,8)
-gs = gridspec.GridSpec(len(selections),3)
+gs = gridspec.GridSpec(len(selections), 3)
 gs.update(hspace=0.01, wspace=0.01)
 for n, sel in enumerate(selections.items()):
     print(sel)
@@ -54,11 +54,6 @@ for n, sel in enumerate(selections.items()):
         ax_left.xaxis.set_visible(False)
     else:
         ax_left.set_xlabel(r"Time (ns)", fontsize=16)
-
-    #if n == (len(selections)) // 2:
-    #    ax_left.set_ylabel(r"RMSD ($\AA$)", fontsize=16)
-
-    
 
     ax_right.yaxis.set_visible(False)
     ax_right.xaxis.set_visible(False)
@@ -92,7 +87,10 @@ for n, sel in enumerate(selections.items()):
     ax_left.set_xlim(min(time), max(time)) 
 
 ax_right.legend()
-fig.text(0.04, 0.5, r"RMSD $(\AA)$", va='center', rotation='vertical', fontsize=16)
+fig.text(
+    0.04, 0.5, r"RMSD $(\AA)$", 
+    va='center', rotation='vertical', fontsize=16
+)
 
 fig.tight_layout()
 pp.savefig("rmsd_density.png")
