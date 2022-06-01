@@ -285,12 +285,6 @@ def main(save=False, show=True):
     if save:
         fig.savefig(f"cn_vs_frame_{atom}_{cutoff}.png")
 
-    # Macroscopic quantities
-    uni.get_macro()
-    fig, axes = plot_macros(uni)
-    if save:
-        fig.savefig(f"macroplot.png")
-
     if show:
         pp.show()
     
