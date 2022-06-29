@@ -161,13 +161,13 @@ class Universe(mda.Universe):
         rdf.run()
         return rdf, g1, g2
 
-    def write_traj(self, seltxt, fname):
+    def write_traj(self, seltxt, fname, start=0, stop=-1, step=1):
         sel = self.select_atoms(seltxt)
         with mda.Writer(fname, sel.n_atoms) as out:
-            for ts in self.trajectory:
+            for ts in self.trajectory[start : stop : step]:
                 out.write(sel)
 
-    def center_protein_write(self, fname):
+    def center_protein_write(self, fname, **kwargs):
         '''
         Adds transformation to center protein and saves to file.
         This slows down iteration, so use only for writing new trajectory to file, 
@@ -183,7 +183,7 @@ class Universe(mda.Universe):
         ]
         self.trajectory.add_transformations(*trans)
         
-        self.write_traj('all', fname)
+        self.write_traj('all', fname, **kwargs)
 
     def _get_rmsd(self, seltxt, ref_frame=0):
         '''Calculates rmsd vs frame no.'''
