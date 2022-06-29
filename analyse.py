@@ -7,6 +7,73 @@ import json
 import pandas as pd
 import matplotlib.pyplot as pp
 
+class InterRDF(RDF.InterRDF):
+    '''
+    Modifies RDF.InterRDF() to accept option to not normalize by volume of box.
+    This is becase the original version fails if this volume is not provided.
+    This new method returns rdf which is essentially No. of particles per volume, per frame.
+    '''
+    def __init__(self, *args, normalize_volume=False, **kwargs):
+        self.normalize_volume = normalize_volume
+        RDF.InterRDF.__init__(self, *args, **kwargs)
+        
+    def _conclude(self):
+        # Number of each selection
+        nA = len(self.g1)
+        nB = len(self.g2)
+        N = nA * nB
+
+        # If we had exclusions, take these into account
+        if self._exclusion_block:
+            xA, xB = self._exclusion_block
+            nblocks = nA / xA
+            N -= xA * xB * nblocks
+
+        # Volume in each radial shell
+        vols = np.power(self.results.edges, 3)
+        vol = 4/3 * np.pi * np.diff(vols)
+
+        # Average number density
+        if self.normalize_volume:
+            box_vol = self.volume / self.n_frames
+            density = N / box_vol
+        else:
+            density = 1
+
+        rdf = self.results.count / (density * vol * self.n_frames)
+        self.results.rdf = rdf
+
+        
+class InterRDF_s(RDF.InterRDF_s):
+        
+    def _conclude(self):
+        # Volume in each radial shell
+        vols = np.power(self.results.edges, 3)
+        vol = 4/3 * np.pi * np.diff(vols)
+
+        # Empty lists to restore indices, RDF
+        indices = []
+        rdf = []
+
+        for i, (ag1, ag2) in enumerate(self.ags):
+            # Number of each selection
+            indices.append([ag1.indices, ag2.indices])
+
+            # Average number density
+            
+
+            if self._density:
+                rdf.append(self.results.count[i] / (vol * self.n_frames))
+            else:
+                box_vol = self.volume / self.n_frames
+                density = 1 / box_vol
+                rdf.append(
+                    self.results.count[i] / (density * vol * self.n_frames))
+
+        self.results.rdf = rdf
+        self.results.indices = indices
+        
+        
 class Universe(mda.Universe):
     '''
     Class based on mda.Universe with additional methods for analysis
@@ -22,7 +89,7 @@ class Universe(mda.Universe):
             sysinfo : <str> Json-format file with dimensions of system
 
         '''
-        mda.Universe.__init__(self, psf, traj)
+        mda.Universe.__init__(self, psf, traj, *args, **kwargs)
         self.psffile = psf
         self.trajfile = traj
 
@@ -82,7 +149,7 @@ class Universe(mda.Universe):
         Arguments:
             sel1    : <str> Selection string
             sel2    : <str> Selection string
-            kwargs  : keyword arguments to pass to RDF.InterRDF()
+            kwargs  : keyword arguments to pass to InterRDF()
 
         returns: MDAnalysis.analysis.rdf object, and atom selection objects
         '''
@@ -90,7 +157,7 @@ class Universe(mda.Universe):
         g1 = self.select_atoms(sel1)
         g2 = self.select_atoms(sel2)
 
-        rdf = RDF.InterRDF(g1, g2, **kwargs)
+        rdf = InterRDF(g1, g2, **kwargs)
         rdf.run()
         return rdf, g1, g2
 
@@ -167,9 +234,59 @@ class Universe(mda.Universe):
                     dists[n].append(d)
 
         return np.array(dists)
-            
+    
+    @staticmethod
+    def get_normal(sel):
+        '''Get the normal direction for a sel containing 3 atoms'''
+        if sel.n_atoms != 3:
+            raise ValueError(f"{sel} does not contain 3 atoms")
+
+        a = sel[1].position - sel[0].position
+        b = sel[2].position - sel[0].position
+
+        return np.cross(a, b)
+
+    def get_dihedral(self, sel1 ,sel2):
+        '''Get dihedral between two planes defined by two atomgroups (3 atoms each)'''
         
-      
+        dihedrals = []
+        for n, ts, in enumerate(self.trajectory):
+            normal1 = self.get_normal(sel1)
+            normal2 = self.get_normal(sel2)
+            l1 = np.linalg.norm(normal1)
+            l2 = np.linalg.norm(normal2)
+            dihed = np.arccos(np.dot(normal1, normal2) / (l1*l2)) * 180/np.pi        
+
+            dihedrals.append(dihed)
+        
+        return np.array(dihedrals)
+    
+    @staticmethod
+    def get_bisector(sel):
+        '''Get the bisector of angle between 3 atoms'''
+        if sel.n_atoms != 3:
+            raise ValueError(f"{sel} does not contain 3 atoms")
+        
+        a = sel[0].position - sel[1].position
+        b = sel[2].position - sel[1].position
+        
+        a = a / np.linalg.norm(a)
+        b = b / np.linalg.norm(b)
+        
+        return (a + b) / 2
+    
+    def get_bisector_angles(self, sel1, sel2):
+        bi_angles = []
+        for n, ts, in enumerate(self.trajectory):
+            b1 = self.get_bisector(sel1)
+            b2 = self.get_bisector(sel2)
+            l1 = np.linalg.norm(b1)
+            l2 = np.linalg.norm(b2)
+            bi_ang = np.arccos(np.dot(b1, b2) / (l1*l2)) * 180/np.pi        
+
+            bi_angles.append(bi_ang)
+        
+        return np.array(bi_angles)        
         
 ## Plotting functions
         

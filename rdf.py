@@ -69,12 +69,19 @@ def plot_all(trajes, save=False, show=True):
     if show:
         pp.show()
     
-
+ref = 'trajectories/input.pdb'
 parsets = [
     'CTPOL', 'opt-CTPOL'
 ]
 trajes = {
     par:f"trajectories/MD-1ZNF/{par}/centered_output.dcd" for par in parsets
 }
+
+unis = dict(NMR=ana.Universe(ref, ref))
+for par in parsets:
+    dcd = f"trajectories/MD-1ZNF/{par}/centered_output.dcd"
+    unis[par] = ana.Universe('output.pdb', dcd)
+    
+
 
 plot_all(trajes, save=True, show=False)
