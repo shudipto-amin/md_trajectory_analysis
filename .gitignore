@@ -6,3 +6,6 @@
 *.png
 
 trajectories
+
+*.zip
+*.dat
