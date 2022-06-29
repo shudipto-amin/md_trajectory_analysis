@@ -61,7 +61,12 @@ Running it directly will also plot and save some RDF, RMSD, and Coordination
 figures, as done within the `main` function of `analyse.py`.
 
 ## Using the example notebooks
-
+The following notebooks automate much of the analysis:
+```
+angles.ipynb
+distances.ipynb
+rdf.ipynb
+```
 To use the example notebooks, you will have to create the following files in exactly the location shown:
 ```
 trajectories/input.pdb
@@ -70,3 +75,11 @@ trajectories/MD-1ZNF/opt-OPLS-AA/centered_output.dcd
 trajectories/MD-1ZNF/CTPOL/centered_output.dcd
 trajectories/MD-1ZNF/opt-CTPOL/centered_output.dcd
 ```
+To plot CT vs time, make sure you have the file:
+```
+CT-data.dat
+```
+
+use the notebook:
+```
+
