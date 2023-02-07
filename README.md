@@ -69,7 +69,7 @@ rdf.ipynb
 ```
 To use the example notebooks, you will have to create the following files in exactly the location shown:
 ```
-trajectories/input.pdb
+trajectories/input.pdb (original 1ZNF pdb file)
 trajectories/MD-1ZNF/OPLS-AA/centered_output.dcd
 trajectories/MD-1ZNF/opt-OPLS-AA/centered_output.dcd
 trajectories/MD-1ZNF/CTPOL/centered_output.dcd

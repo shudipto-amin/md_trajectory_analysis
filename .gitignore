@@ -1,11 +1,16 @@
+# data and images
+*.dat
 *.dcd
-*.swp
-*__pycache__*
-*.pyc
-*.ipynb_checkpoints*
+*.pdf
 *.png
-
+*.zip
 trajectories
 
-*.zip
-*.dat
+# auto generated
+*.ipynb_checkpoints*
+*__pycache__*
+*.pyc
+*.swp
+
+# macos
+.DS_Store
